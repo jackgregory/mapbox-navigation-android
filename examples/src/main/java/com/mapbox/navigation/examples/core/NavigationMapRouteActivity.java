@@ -23,6 +23,7 @@ import com.mapbox.geojson.Point;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.location.LocationComponent;
 import com.mapbox.mapboxsdk.location.LocationComponentActivationOptions;
+import com.mapbox.mapboxsdk.location.OnIndicatorPositionChangedListener;
 import com.mapbox.mapboxsdk.location.modes.CameraMode;
 import com.mapbox.mapboxsdk.location.modes.RenderMode;
 import com.mapbox.mapboxsdk.maps.MapView;
@@ -118,7 +119,8 @@ public class NavigationMapRouteActivity extends AppCompatActivity implements OnM
       mapCamera = new NavigationCamera(mapboxMap);
       mapCamera.addProgressChangeListener(mapboxNavigation);
       navigationMapRoute = new NavigationMapRoute.Builder(mapView, mapboxMap, this)
-              .withMapboxNavigation(mapboxNavigation, true)
+              .withMapboxNavigation(mapboxNavigation)
+              .withVanishingRouteLineEnabled(true)
               .build();
 
       mapboxNavigation.getNavigationOptions().getLocationEngine().getLastLocation(locationEngineCallback);

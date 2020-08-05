@@ -2,6 +2,7 @@ package com.mapbox.navigation.ui.route
 
 import android.content.Context
 import android.graphics.drawable.Drawable
+import android.util.LruCache
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
 import com.mapbox.api.directions.v5.models.DirectionsRoute
@@ -29,9 +30,11 @@ import com.mapbox.navigation.ui.internal.route.RouteConstants.ALTERNATIVE_ROUTE_
 import com.mapbox.navigation.ui.internal.route.RouteConstants.HEAVY_CONGESTION_VALUE
 import com.mapbox.navigation.ui.internal.route.RouteConstants.MINIMUM_ROUTE_LINE_OFFSET
 import com.mapbox.navigation.ui.internal.route.RouteConstants.MODERATE_CONGESTION_VALUE
+import com.mapbox.navigation.ui.internal.route.RouteConstants.POINT_DISTANCE_CALCULATION_FUN_CACHE_SIZE
 import com.mapbox.navigation.ui.internal.route.RouteConstants.PRIMARY_ROUTE_LAYER_ID
 import com.mapbox.navigation.ui.internal.route.RouteConstants.PRIMARY_ROUTE_TRAFFIC_LAYER_ID
 import com.mapbox.navigation.ui.internal.route.RouteConstants.PRIMARY_ROUTE_TRAFFIC_SOURCE_ID
+import com.mapbox.navigation.ui.internal.route.RouteConstants.ROUTE_LINE_UPDATE_MAX_DISTANCE_THRESHOLD_IN_METERS
 import com.mapbox.navigation.ui.internal.route.RouteConstants.SEVERE_CONGESTION_VALUE
 import com.mapbox.navigation.ui.internal.route.RouteConstants.UNKNOWN_CONGESTION_VALUE
 import com.mapbox.navigation.ui.internal.route.RouteConstants.WAYPOINT_DESTINATION_VALUE
@@ -39,6 +42,7 @@ import com.mapbox.navigation.ui.internal.route.RouteConstants.WAYPOINT_ORIGIN_VA
 import com.mapbox.navigation.ui.internal.route.RouteConstants.WAYPOINT_PROPERTY_KEY
 import com.mapbox.navigation.ui.internal.route.RouteLayerProvider
 import com.mapbox.navigation.ui.internal.utils.MapUtils
+import com.mapbox.navigation.ui.internal.utils.MemoizeUtils.memoize
 import com.mapbox.navigation.ui.route.MapRouteLine.MapRouteLineSupport.buildWayPointFeatureCollection
 import com.mapbox.navigation.ui.route.MapRouteLine.MapRouteLineSupport.calculateRouteLineSegments
 import com.mapbox.navigation.ui.route.MapRouteLine.MapRouteLineSupport.generateFeatureCollection
@@ -51,7 +55,9 @@ import com.mapbox.navigation.ui.route.MapRouteLine.MapRouteLineSupport.swapPrope
 import com.mapbox.navigation.utils.internal.ThreadController
 import com.mapbox.navigation.utils.internal.ifNonNull
 import com.mapbox.navigation.utils.internal.parallelMap
+import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
+import com.mapbox.turf.TurfMisc
 import java.math.BigDecimal
 
 /**
@@ -910,12 +916,40 @@ internal class MapRouteLine(
         }
     }
 
+    /**
+     * Updates the route line appearance from the origin point to the point indicated in
+     * @param point representing the portion of the route that has been traveled.
+     */
+    fun updateTraveledRouteLine(point: Point) {
+        ifNonNull(primaryRoute, primaryRoute?.distance()) { primaryRoute, routeDistance ->
+            val lineString = getLineStringForRoute(primaryRoute)
+            val nearestPointOnLineDistance = TurfMisc.nearestPointOnLine(
+                point,
+                lineString.coordinates(),
+                TurfConstants.UNIT_METERS
+            ).getProperty("dist").asDouble
+
+            if (nearestPointOnLineDistance > ROUTE_LINE_UPDATE_MAX_DISTANCE_THRESHOLD_IN_METERS) {
+                return
+            }
+
+            val distanceTraveled = MapRouteLineSupport.findDistanceOfPointAlongLine(lineString, point)
+            val percentTraveled = (distanceTraveled / routeDistance).toFloat()
+            if (percentTraveled > MINIMUM_ROUTE_LINE_OFFSET) {
+                val expression = getExpressionAtOffset(percentTraveled)
+                hideCasingLineAtOffset(percentTraveled)
+                hideRouteLineAtOffset(percentTraveled)
+                decorateRouteLine(expression)
+            }
+        }
+    }
+
     internal object MapRouteLineSupport {
 
         /**
          * Returns a resource value from the style or a default value
          * @param index the index of the item in the styled attributes.
-         * @param defaultValue the default value to use if no value is found
+         * @param colorResourceId the default value to use if no value is found
          * @param context the context to obtain the resource from
          * @param styleRes the style resource to look in
          *
@@ -1215,6 +1249,55 @@ internal class MapRouteLine(
             }
         }
 
+        val getDistanceBetweenPoints: (firstPoint: Point, secondPoint: Point) -> Double = { firstPoint: Point, secondPoint: Point ->
+            TurfMeasurement.distance(firstPoint, secondPoint, TurfConstants.UNIT_METERS)
+        }.memoize(POINT_DISTANCE_CALCULATION_FUN_CACHE_SIZE)
+
+        fun getDistanceSum(points: List<Point>): Double {
+            var previousPoint = points[0]
+            var distance = 0.0
+            for (index in 1 until points.size) {
+                distance += getDistanceBetweenPoints(previousPoint, points[index])
+                previousPoint = points[index]
+            }
+            return distance
+        }
+
+        private val lineStringPointCache = LruCache<LineString, Int>(1)
+
+        fun findDistanceOfPointAlongLine(line: LineString, point: Point): Double {
+            val lastPointIndexFromCache = lineStringPointCache[line] ?: 0
+            val distFromPointToOrigin = TurfMeasurement.distance(point, line.coordinates().first(), TurfConstants.UNIT_METERS)
+            val distFromPointToIndex = TurfMeasurement.distance(point, line.coordinates()[lastPointIndexFromCache], TurfConstants.UNIT_METERS)
+
+            val lastPointIndex = if (distFromPointToOrigin < distFromPointToIndex) {
+                0
+            } else {
+                lastPointIndexFromCache
+            }
+
+            val points = getClosestPointAlongLine(line, point, lastPointIndex)
+            val coordinatesTraveled = line.coordinates().subList(0, points.first).plus(points.second)
+            return getDistanceSum(coordinatesTraveled).also {
+                lineStringPointCache.put(line, points.first)
+            }
+        }
+
+        private fun getClosestPointAlongLine(line: LineString, endPoint: Point, startingIndex: Int): Pair<Int, Point> {
+            var closestPointIndex = startingIndex
+
+            for (currentIndex in startingIndex + 1 until line.coordinates().size) {
+                val distanceToNextPoint = TurfMeasurement.distance(line.coordinates()[currentIndex], endPoint, TurfConstants.UNIT_METERS)
+                val distanceToEndPoint = TurfMeasurement.distance(line.coordinates()[closestPointIndex], endPoint, TurfConstants.UNIT_METERS)
+                if (distanceToEndPoint < distanceToNextPoint) {
+                    return Pair(closestPointIndex, endPoint)
+                } else {
+                    closestPointIndex = currentIndex
+                }
+            }
+            return Pair(closestPointIndex, endPoint)
+        }
+
         fun swapProperties(featureA: Feature, featureB: Feature) {
             val featureAProperties = featureA.properties()
             val featureAKeySetToRemove = featureAProperties?.keySet()?.toList()
@@ -1238,7 +1321,7 @@ internal class MapRouteLine(
  * Maintains an association between a DirectionsRoute, FeatureCollection
  * and LineString.
  *
- * @param route a Directionsroute
+ * @param route a DirectionsRoute
  * @param featureCollection a FeatureCollection created using the route
  * @param lineString a LineString derived from the route's geometry.
  */

@@ -13,8 +13,9 @@ import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.OnLifecycleEvent;
 
 import com.mapbox.api.directions.v5.models.DirectionsRoute;
+import com.mapbox.geojson.Point;
+import com.mapbox.mapboxsdk.location.OnIndicatorPositionChangedListener;
 import com.mapbox.navigation.core.trip.session.RouteProgressObserver;
-import com.mapbox.navigation.core.trip.session.TripSessionState;
 import com.mapbox.navigation.ui.R;
 import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
@@ -23,9 +24,7 @@ import com.mapbox.navigation.base.trip.model.RouteProgress;
 import com.mapbox.navigation.core.MapboxNavigation;
 import com.mapbox.navigation.ui.internal.route.MapRouteSourceProvider;
 import com.mapbox.navigation.ui.internal.route.RouteLayerProvider;
-import com.mapbox.navigation.ui.internal.route.RouteConstants;
 import com.mapbox.navigation.ui.internal.utils.CompareUtils;
-import com.mapbox.navigation.ui.internal.utils.RouteLineValueAnimator;
 
 import org.jetbrains.annotations.TestOnly;
 
@@ -73,13 +72,9 @@ public class NavigationMapRoute implements LifecycleObserver {
   @Nullable
   private MapRouteLine routeLine;
   private MapRouteArrow routeArrow;
-  private boolean vanishRouteLineEnabled;
-  @Nullable
   private MapRouteLineInitializedCallback routeLineInitializedCallback;
-  @Nullable
-  private RouteLineValueAnimator vanishingRouteLineAnimator;
-  @Nullable
   private List<RouteStyleDescriptor> routeStyleDescriptors;
+  private boolean vanishingRouteLineEnabled;
 
   /**
    * Construct an instance of {@link NavigationMapRoute}.
@@ -91,7 +86,6 @@ public class NavigationMapRoute implements LifecycleObserver {
    * @param lifecycleOwner provides lifecycle for the component
    * @param styleRes a style resource with custom route colors, scale, etc.
    * @param belowLayer optionally pass in a layer id to place the route line below
-   * @param vanishRouteLineEnabled determines if the route line should vanish behind the puck during navigation.
    * @param routeLineInitializedCallback indicates that the route line layer has been added to the current style
    * @param routeStyleDescriptors optionally describes the styling of the route lines
    */
@@ -101,11 +95,11 @@ public class NavigationMapRoute implements LifecycleObserver {
       @NonNull LifecycleOwner lifecycleOwner,
       @StyleRes int styleRes,
       @Nullable String belowLayer,
-      boolean vanishRouteLineEnabled,
       @Nullable MapRouteLineInitializedCallback routeLineInitializedCallback,
-      @Nullable List<RouteStyleDescriptor> routeStyleDescriptors) {
+      @Nullable List<RouteStyleDescriptor> routeStyleDescriptors,
+      @NonNull boolean vanishingRouteLineEnabled) {
+    this.vanishingRouteLineEnabled = vanishingRouteLineEnabled;
     this.routeStyleDescriptors = routeStyleDescriptors;
-    this.vanishRouteLineEnabled = vanishRouteLineEnabled;
     this.styleRes = styleRes;
     this.belowLayer = belowLayer;
     this.mapView = mapView;
@@ -195,13 +189,11 @@ public class NavigationMapRoute implements LifecycleObserver {
    */
   public void addRoutes(@NonNull @Size(min = 1) List<? extends DirectionsRoute> directionsRoutes) {
     if (directionsRoutes.isEmpty()) {
-      cancelVanishingRouteLineAnimator();
       routeLine.draw(directionsRoutes);
     } else if (!CompareUtils.areEqualContentsIgnoreOrder(
         routeLine.retrieveDirectionsRoutes(),
         directionsRoutes)
     ) {
-      cancelVanishingRouteLineAnimator();
       routeLine.draw(directionsRoutes);
     }
   }
@@ -274,17 +266,16 @@ public class NavigationMapRoute implements LifecycleObserver {
   }
 
   /**
-   * This method will allow this class to listen to route progress and adapt the route line
-   * whenever {@link TripSessionState#STARTED}.
+   * This method will allow this class to listen to new routes based on
+   * the progress updates from {@link MapboxNavigation}.
+   * <p>
+   * If a new route is given to {@link MapboxNavigation#startTripSession()}, this
+   * class will automatically draw the new route.
    *
    * @param navigation to add the progress change listener
-   * @param vanishRouteLineEnabled determines if the route line should vanish behind the puck.
-   * @see MapboxNavigation#startTripSession()
    */
-  public void addProgressChangeListener(@NonNull MapboxNavigation navigation, boolean vanishRouteLineEnabled) {
+  public void addProgressChangeListener(MapboxNavigation navigation) {
     this.navigation = navigation;
-    this.vanishRouteLineEnabled = vanishRouteLineEnabled;
-    this.mapRouteProgressChangeListener = buildMapRouteProgressChangeListener();
     navigation.registerRouteProgressObserver(mapRouteProgressChangeListener);
   }
 
@@ -294,8 +285,7 @@ public class NavigationMapRoute implements LifecycleObserver {
    *
    * @param navigation to remove the progress change listener
    */
-  public void removeProgressChangeListener(@Nullable MapboxNavigation navigation) {
-    shutdownVanishingRouteLineAnimator();
+  public void removeProgressChangeListener(MapboxNavigation navigation) {
     if (navigation != null) {
       navigation.unregisterRouteProgressObserver(mapRouteProgressChangeListener);
     }
@@ -316,6 +306,10 @@ public class NavigationMapRoute implements LifecycleObserver {
     }
   }
 
+  private OnIndicatorPositionChangedListener onIndicatorPositionChangedListener = point -> {
+    routeLine.updateTraveledRouteLine(point);
+  };
+
   /**
    * Called during the onStart event of the Lifecycle owner to initialize resources.
    */
@@ -330,7 +324,6 @@ public class NavigationMapRoute implements LifecycleObserver {
    */
   @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
   protected void onStop() {
-    shutdownVanishingRouteLineAnimator();
     removeListeners();
   }
 
@@ -385,6 +378,10 @@ public class NavigationMapRoute implements LifecycleObserver {
       mapView.addOnDidFinishLoadingStyleListener(didFinishLoadingStyleListener);
       isDidFinishLoadingStyleListenerAdded = true;
     }
+
+    if (vanishingRouteLineEnabled) {
+      mapboxMap.getLocationComponent().addOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener);
+    }
   }
 
   private void removeListeners() {
@@ -399,22 +396,11 @@ public class NavigationMapRoute implements LifecycleObserver {
       mapView.removeOnDidFinishLoadingStyleListener(didFinishLoadingStyleListener);
       isDidFinishLoadingStyleListenerAdded = false;
     }
+
+    mapboxMap.getLocationComponent().removeOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener);
   }
 
-  private void shutdownVanishingRouteLineAnimator() {
-    if (this.vanishingRouteLineAnimator != null) {
-      this.vanishingRouteLineAnimator.setValueAnimatorHandler(null);
-      cancelVanishingRouteLineAnimator();
-    }
-  }
-
-  private void cancelVanishingRouteLineAnimator() {
-    if (this.vanishingRouteLineAnimator != null) {
-      this.vanishingRouteLineAnimator.cancelAnimationCallbacks();
-    }
-  }
-
-  private void redraw(@NonNull Style style) {
+  private void redraw(Style style) {
     recreateRouteLine(style);
     boolean arrowVisibility = routeArrow.routeArrowIsVisible();
     routeArrow = new MapRouteArrow(mapView, mapboxMap, styleRes, routeLine.getTopLayerId());
@@ -460,47 +446,18 @@ public class NavigationMapRoute implements LifecycleObserver {
 
   @Nullable
   private MapRouteProgressChangeListener buildMapRouteProgressChangeListener() {
-    shutdownVanishingRouteLineAnimator();
-    if (vanishRouteLineEnabled) {
-      vanishingRouteLineAnimator = new RouteLineValueAnimator();
-      vanishingRouteLineAnimator.setAnimationDelay(RouteConstants.ROUTE_LINE_VANISH_ANIMATION_DELAY);
-    } else {
-      vanishingRouteLineAnimator = null;
-    }
-
-    float vanishingPoint = (this.mapRouteProgressChangeListener != null)
-            ? this.mapRouteProgressChangeListener.getPercentDistanceTraveled() : 0f;
-    MapRouteProgressChangeListener newListener = new MapRouteProgressChangeListener(
-            this.routeLine,
-            routeArrow,
-            vanishingRouteLineAnimator
-    );
-    newListener.updatePercentDistanceTraveled(vanishingPoint);
-    return newListener;
+    return new MapRouteProgressChangeListener(this.routeLine, routeArrow);
   }
 
   /**
-   * Returns the percentage of the distance traveled that was last calculated. This is only
-   * calculated if the vanishing route line feature is enabled.
+   * Updates the appearance of the route line representing the part of the route that has
+   * been traveled.  The line appearance will be altered from the origin point to the point
+   * indicated by the @param point
    *
-   * @return the value calculated during the last progress update event or 0 if not enabled.
+   * @param point the end point of the traveled section of the route line.
    */
-  public float getPercentDistanceTraveled() {
-    return mapRouteProgressChangeListener.getPercentDistanceTraveled();
-  }
-
-  /**
-   * Can be used to manually update the percentage of route traveled.
-   *
-   * This is also invoked automatically when the vanishing route line feature is enabled and
-   * a new route progress update is delivered.
-   * @see #addProgressChangeListener(MapboxNavigation, boolean)
-   * @see #onNewRouteProgress(RouteProgress)
-   */
-  public void updateRouteLineWithDistanceTraveled(float distanceTraveled) {
-    routeLine.hideCasingLineAtOffset(distanceTraveled);
-    routeLine.hideRouteLineAtOffset(distanceTraveled);
-    mapRouteProgressChangeListener.updatePercentDistanceTraveled(distanceTraveled);
+  public void updateTraveledRouteLine(Point point) {
+    routeLine.updateTraveledRouteLine(point);
   }
 
   /**
@@ -513,9 +470,9 @@ public class NavigationMapRoute implements LifecycleObserver {
     @Nullable private MapboxNavigation navigation;
     @StyleRes private int styleRes = R.style.NavigationMapRoute;
     @Nullable private String belowLayer;
-    private boolean vanishRouteLineEnabled = false;
     @Nullable private MapRouteLineInitializedCallback routeLineInitializedCallback;
     @Nullable private List<RouteStyleDescriptor> routeStyleDescriptors;
+    @NonNull private boolean vanishingRouteLineEnabled;
 
     /**
      * Instantiates a new Builder.
@@ -534,14 +491,11 @@ public class NavigationMapRoute implements LifecycleObserver {
      * An instance of the {@link MapboxNavigation} object. Default is null that means
      * your route won't consider rerouting during a navigation session.
      *
-     * @param vanishRouteLineEnabled determines if the route line should vanish behind the puck
-     * during navigation. By default is `false`
      * @return the builder
      */
     @NonNull
-    public Builder withMapboxNavigation(@Nullable MapboxNavigation navigation, boolean vanishRouteLineEnabled) {
+    public Builder withMapboxNavigation(@Nullable MapboxNavigation navigation) {
       this.navigation = navigation;
-      this.vanishRouteLineEnabled = vanishRouteLineEnabled;
       return this;
     }
 
@@ -592,20 +546,31 @@ public class NavigationMapRoute implements LifecycleObserver {
     }
 
     /**
+     * Indicates whether or not the vanishing route line feature should be enabled.
+     *
+     * @return the builder
+     */
+    @NonNull
+    public Builder withVanishingRouteLineEnabled(boolean enabled) {
+      this.vanishingRouteLineEnabled = enabled;
+      return this;
+    }
+
+    /**
      * Build an instance of {@link NavigationMapRoute}
      */
     @Nullable
     public NavigationMapRoute build() {
       return new NavigationMapRoute(
-          navigation,
-          mapView,
-          mapboxMap,
-          lifecycleOwner,
-          styleRes,
-          belowLayer,
-          vanishRouteLineEnabled,
-          routeLineInitializedCallback,
-          routeStyleDescriptors
+              navigation,
+              mapView,
+              mapboxMap,
+              lifecycleOwner,
+              styleRes,
+              belowLayer,
+              routeLineInitializedCallback,
+              routeStyleDescriptors,
+              vanishingRouteLineEnabled
       );
     }
   }
