@@ -4,6 +4,9 @@ package com.mapbox.navigation.instrumentation_tests.utils.routes
 import android.content.Context
 import com.mapbox.api.directions.v5.models.BannerInstructions
 import com.mapbox.api.directions.v5.models.DirectionsResponse
+import com.mapbox.api.directions.v5.models.DirectionsRoute
+import com.mapbox.core.constants.Constants
+import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.navigation.instrumentation_tests.R
 import com.mapbox.navigation.instrumentation_tests.utils.bufferFromRawFile
@@ -43,6 +46,34 @@ object MockRoutesProvider {
                 BannerInstructions.fromJson(readRawFileText(context, R.raw.route_response_dc_very_short_banner_instructions_2)),
                 BannerInstructions.fromJson(readRawFileText(context, R.raw.route_response_dc_very_short_banner_instructions_3))
             )
+        )
+    }
+
+    fun simpleRoute(context: Context): MockRoute {
+        val jsonResponse = readRawFileText(context, R.raw.route_response_simple)
+        val directionsResponse = DirectionsResponse.fromJson(jsonResponse)
+        val route = directionsResponse.routes()[0]
+        val routeGeometry = getLineString(route)
+
+        return MockRoute(
+            jsonResponse,
+            DirectionsResponse.fromJson(jsonResponse),
+            listOf(
+                MockDirectionsRequestHandler(
+                    profile = "driving",
+                    jsonResponse = jsonResponse,
+                    routeGeometry.coordinates()
+                )
+            ),
+            routeGeometry.coordinates(),
+            listOf()
+        )
+    }
+
+    private fun getLineString(route: DirectionsRoute): LineString {
+        return LineString.fromPolyline(
+            route.geometry() ?: "",
+            Constants.PRECISION_6
         )
     }
 }
