@@ -12,6 +12,7 @@ libnavui-maps \
 libnavui-base \
 libnavui-util \
 libnavui-tripprogress \
+libnavui-speedlimit \
 
 APPLICATION_MODULES = \
 test-app \
@@ -142,12 +143,14 @@ ui-check-api:
 	./gradlew :libnavui-maps:checkApi -PhidePackage=com.mapbox.navigation.ui.maps.internal -PhideId=ReferencesHidden
 	./gradlew :libnavui-base:checkApi -PhidePackage=com.mapbox.navigation.ui.base.internal -PhideId=ReferencesHidden
 	./gradlew :libnavui-util:checkApi -PhidePackage=com.mapbox.navigation.ui.utils.internal -PhideId=ReferencesHidden
+	./gradlew :libnavui-speedlimit:checkApi -PhidePackage=com.mapbox.navigation.ui.speedlimit.internal -PhideId=ReferencesHidden
 
 .PHONY: ui-update-api
 ui-update-api:
 	./gradlew :libnavui-maps:updateApi -PhidePackage=com.mapbox.navigation.ui.maps.internal
 	./gradlew :libnavui-base:updateApi -PhidePackage=com.mapbox.navigation.ui.base.internal
 	./gradlew :libnavui-util:updateApi -PhidePackage=com.mapbox.navigation.ui.utils.internal
+	./gradlew :libnavui-speedlimit:updateApi -PhidePackage=com.mapbox.navigation.ui.speedlimit.internal
 
 .PHONY: update-metalava
 update-metalava:

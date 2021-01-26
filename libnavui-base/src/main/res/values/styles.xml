@@ -275,6 +275,13 @@
         <item name="android:textColor">@color/mapbox_feedback_bottom_sheet_secondary_text</item>
     </style>
 
+    <style name="SpeedLimitView">
+        <item name="speedLimitTextColor">?attr/speedLimitTextColor</item>
+        <item name="speedLimitMutcdBorderColor">?attr/speedLimitMutcdBorderColor</item>
+        <item name="speedLimitBackgroundColor">?attr/speedLimitBackgroundColor</item>
+        <item name="speedLimitViennaBorderColor">?attr/speedLimitViennaBorderColor</item>
+    </style>
+
 <!--    <style name="MapboxStyleFeedbackBottomSheetDescriptionItemCheckbox" parent="Theme.AppCompat.Light">-->
 <!--        <item name="colorControlNormal">@color/mapbox_feedback_bottom_sheet_icon_secondary</item>-->
 <!--        <item name="colorControlActivated">@color/mapbox_feedback_bottom_sheet_icon_secondary</item>-->

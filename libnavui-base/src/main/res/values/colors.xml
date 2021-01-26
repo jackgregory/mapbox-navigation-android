@@ -59,6 +59,11 @@
   <color name="mapbox_navigation_view_color_banner_maneuver_primary_dark">#FFFFFF</color>
   <color name="mapbox_navigation_view_color_banner_maneuver_secondary_dark">#4DFFFFFF</color>
 
+  <color name="mapbox_navigation_view_color_speed_limit_text">#000000</color>
+  <color name="mapbox_navigation_view_color_speed_limit_background">#FFFFFF</color>
+  <color name="mapbox_navigation_view_color_speed_limit_mutcd_border">#000000</color>
+  <color name="mapbox_navigation_view_color_speed_limit_vienna_border">#EE0000</color>
+
   <!-- Alert View -->
   <color name="mapbox_navigation_view_color_progress">#4B75A4</color>
   <color name="mapbox_navigation_view_color_progress_background">#39587B</color>
@@ -120,5 +125,12 @@
   <color name="mapbox_summary_bottom_sheet_progress_bar">@color/mapbox_navigation_view_color_accent</color>
   <color name="mapbox_summary_bottom_sheet_primary_text">@color/mapbox_navigation_view_color_primary_text</color>
   <color name="mapbox_summary_bottom_sheet_secondary_text">@color/mapbox_navigation_view_color_accent_text</color>
+
+  <!-- Default SpeedLimitView -->
+  <color name="mapbox_speed_limit_text_color">@color/mapbox_navigation_view_color_speed_limit_text</color>
+  <color name="mapbox_speed_limit_view_background">@color/mapbox_navigation_view_color_speed_limit_background</color>
+  <color name="mapbox_speed_limit_view_mutcd_border">@color/mapbox_navigation_view_color_speed_limit_mutcd_border</color>
+  <color name="mapbox_speed_limit_view_vienna_border">@color/mapbox_navigation_view_color_speed_limit_vienna_border</color>
+
 </resources>
 

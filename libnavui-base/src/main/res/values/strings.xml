@@ -81,6 +81,9 @@
     <!-- Shown in off-route scenarios to provide feedback -->
     <string name="mapbox_report_problem">Report Problem</string>
 
+    <!-- Max Speed Limit -->
+    <string name="max_speed">MAX\n%1$d</string>
+
     <!-- Should not be translated -->
     <string name="mapbox_navigation_guidance_day"
             translatable="false">mapbox://styles/mapbox/navigation-day-v1</string>

@@ -140,4 +140,11 @@
     <attr name="tripProgressPrimaryTextColor" format="reference|color"/>
     <attr name="tripProgressViewBackgroundColor" format="reference|color"/>
   </declare-styleable>
+
+  <declare-styleable name="MapboxSpeedLimitView" >
+    <attr name="speedLimitMutcdBorderColor" format="reference|color" />
+    <attr name="speedLimitBackgroundColor" format="reference|color" />
+    <attr name="speedLimitViennaBorderColor" format="reference|color" />
+    <attr name="speedLimitTextColor" format="reference|color"/>
+  </declare-styleable>
 </resources>
