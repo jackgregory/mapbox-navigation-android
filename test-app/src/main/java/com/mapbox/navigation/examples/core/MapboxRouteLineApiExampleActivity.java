@@ -54,7 +54,9 @@ import com.mapbox.navigation.core.directions.session.RoutesObserver;
 import com.mapbox.navigation.core.directions.session.RoutesRequestCallback;
 import com.mapbox.navigation.core.replay.MapboxReplayer;
 import com.mapbox.navigation.core.replay.ReplayLocationEngine;
+import com.mapbox.navigation.core.replay.history.ReplayEventBase;
 import com.mapbox.navigation.core.replay.route.ReplayProgressObserver;
+import com.mapbox.navigation.core.replay.route.ReplayRouteMapper;
 import com.mapbox.navigation.core.trip.session.LocationObserver;
 import com.mapbox.navigation.core.trip.session.RouteProgressObserver;
 import com.mapbox.navigation.examples.util.LocationPermissionsHelper;
@@ -95,6 +97,7 @@ public class MapboxRouteLineApiExampleActivity extends AppCompatActivity impleme
   private PredictiveCacheController predictiveCacheController;
   private LocationPluginImpl locationComponent;
   private CameraAnimationsPlugin mapCamera;
+  private final ReplayRouteMapper replayRouteMapper = new ReplayRouteMapper();
   private final MapboxReplayer mapboxReplayer = new MapboxReplayer();
   private MapboxNavigation mapboxNavigation;
   private Button startNavigation;
@@ -174,6 +177,7 @@ public class MapboxRouteLineApiExampleActivity extends AppCompatActivity impleme
       mapboxNavigation.startTripSession();
       startNavigation.setVisibility(View.GONE);
       getLocationComponent().addOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener);
+      startSimulation(mapboxNavigation.getRoutes().get(0));
     });
 
     ((FloatingActionButton)findViewById(R.id.fabToggleStyle)).setOnClickListener(new View.OnClickListener() {
@@ -214,7 +218,7 @@ public class MapboxRouteLineApiExampleActivity extends AppCompatActivity impleme
             }
             routeArrowView.render(style, arrowVisibilityState);
 
-            RouteArrowState.UpdateManeuverArrowState redrawState = routeArrow.redraw();
+            RouteArrowState.ArrowModificationState.ArrowAddedState redrawState = routeArrow.redraw();
             routeArrowView.render(style, redrawState);
           }
         }, null);
@@ -236,6 +240,16 @@ public class MapboxRouteLineApiExampleActivity extends AppCompatActivity impleme
     mapboxNavigation.registerRoutesObserver(routesObserver);
 
     mapboxReplayer.pushRealLocation(this, 0.0);
+    mapboxReplayer.playbackSpeed(1.5);
+    mapboxReplayer.play();
+  }
+
+  private void startSimulation(DirectionsRoute route) {
+    mapboxReplayer.stop();
+    mapboxReplayer.clearEvents();
+    List<ReplayEventBase> replayData = replayRouteMapper.mapDirectionsRouteGeometry(route);
+    mapboxReplayer.pushEvents(replayData);
+    mapboxReplayer.seekTo(replayData.get(0));
     mapboxReplayer.play();
   }
 
@@ -513,7 +527,7 @@ public class MapboxRouteLineApiExampleActivity extends AppCompatActivity impleme
       }
       mapboxRouteLineApi.updateWithRouteProgress(routeProgress);
 
-      RouteArrowState.UpdateManeuverArrowState updateArrowState = routeArrow.updateUpcomingManeuverArrow(routeProgress);
+      RouteArrowState.UpdateManeuverArrowState updateArrowState = routeArrow.addUpcomingManeuverArrow(routeProgress);
       routeArrowView.render(mapboxMap.getStyle(), updateArrowState);
 
       DirectionsRoute currentRoute = routeProgress.getRoute();
