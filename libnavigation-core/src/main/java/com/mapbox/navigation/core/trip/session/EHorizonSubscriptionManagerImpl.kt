@@ -58,6 +58,10 @@ internal class EHorizonSubscriptionManagerImpl(
             currentPosition = eHorizonPosition
             currentDistances = eHorizonDistances
 
+            val edgeMetadata: auto =
+                graphAccessor.getEdgeMetadata({ position -> position().edgeId })
+            val edgeShape: auto = graphAccessor.getEdgeShape({ position -> position().edgeId })
+
             notifyAllObservers {
                 onPositionUpdated(eHorizonPosition, eHorizonDistances)
             }

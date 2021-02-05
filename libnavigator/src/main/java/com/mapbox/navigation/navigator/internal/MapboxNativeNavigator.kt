@@ -294,12 +294,14 @@ interface MapboxNativeNavigator {
      */
     fun getEdgeMetadata(edgeId: Long): EdgeMetadata?
 
+    //TODO not used at the moment. Remove?
     fun getRoadObjectsOnTheEdge(edgeId: Long) : Map<String, RoadObjectEdgeLocation>
 
     fun getRoadObjectMetadata(roadObjectId: String): RoadObjectMetadata?
 
     fun getRoadObjectLocation(roadObjectId: String): RoadObjectLocation?
 
+    //TODO not used at the moment. Remove?
     fun getRoadObjectIdsByEdgeIds(edgeIds: List<Long>): List<String?>
 
     val navigatorMapper: NavigatorMapper
