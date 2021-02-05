@@ -15,7 +15,9 @@ import com.mapbox.navigation.navigator.toFixLocation
 import com.mapbox.navigation.navigator.toLocation
 import com.mapbox.navigation.utils.internal.ifNonNull
 import com.mapbox.navigator.BannerInstruction
+import com.mapbox.navigator.EdgeMetadata
 import com.mapbox.navigator.ElectronicHorizonObserver
+import com.mapbox.navigator.GraphAccessor
 import com.mapbox.navigator.HistoryRecorderHandle
 import com.mapbox.navigator.NavigationStatus
 import com.mapbox.navigator.Navigator
@@ -23,6 +25,11 @@ import com.mapbox.navigator.NavigatorConfig
 import com.mapbox.navigator.PredictiveCacheController
 import com.mapbox.navigator.PredictiveCacheControllerOptions
 import com.mapbox.navigator.PredictiveLocationTrackerOptions
+import com.mapbox.navigator.RoadObjectEdgeLocation
+import com.mapbox.navigator.RoadObjectLocation
+import com.mapbox.navigator.RoadObjectMetadata
+import com.mapbox.navigator.RoadObjectsStore
+import com.mapbox.navigator.RoadObjectsStoreObserver
 import com.mapbox.navigator.RouteState
 import com.mapbox.navigator.Router
 import com.mapbox.navigator.RouterResult
@@ -32,7 +39,6 @@ import com.mapbox.navigator.VoiceInstruction
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
-import java.lang.Error
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
@@ -58,7 +64,9 @@ object MapboxNativeNavigatorImpl : MapboxNativeNavigator {
     private var historyRecorderHandle: HistoryRecorderHandle? = null
     private var route: DirectionsRoute? = null
     private var routeBufferGeoJson: Geometry? = null
-    private val navigatorMapper = NavigatorMapper()
+    override val navigatorMapper = NavigatorMapper()
+    private var graphAccessor: GraphAccessor? = null
+    private var roadObjectsStore: RoadObjectsStore? = null
 
     // Route following
 
@@ -79,6 +87,8 @@ object MapboxNativeNavigatorImpl : MapboxNativeNavigator {
         navigator = nativeComponents.navigator
         nativeRouter = nativeComponents.nativeRouter
         historyRecorderHandle = nativeComponents.historyRecorderHandle
+        graphAccessor = nativeComponents.graphAccessor
+        roadObjectsStore = nativeComponents.navigator.roadObjectStore()
         route = null
         routeBufferGeoJson = null
         return this
@@ -349,6 +359,15 @@ object MapboxNativeNavigatorImpl : MapboxNativeNavigator {
     }
 
     /**
+     * Sets the Road objects store observer
+     *
+     * @param roadObjectsStoreObserver
+     */
+    override fun setRoadObjectsStoreObserver(roadObjectsStoreObserver: RoadObjectsStoreObserver?) {
+        roadObjectsStore?.setObserver(roadObjectsStoreObserver)
+    }
+
+    /**
      * Creates a Maps [PredictiveCacheController].
      *
      * @param tileStore Maps [TileStore]
@@ -384,6 +403,24 @@ object MapboxNativeNavigatorImpl : MapboxNativeNavigator {
             createDefaultNavigationPredictiveCacheControllerOptions(onboardRouterOptions),
             createDefaultPredictiveLocationTrackerOptions(predictiveCacheLocationOptions)
         )
+
+    override fun getEdgeShape(edgeId: Long): List<Point>? =
+        graphAccessor?.getEdgeShape(edgeId)
+
+    override fun getEdgeMetadata(edgeId: Long): EdgeMetadata? =
+        graphAccessor?.getEdgeMetadata(edgeId)
+
+    override fun getRoadObjectsOnTheEdge(edgeId: Long): Map<String, RoadObjectEdgeLocation> =
+        roadObjectsStore?.get(edgeId) ?: emptyMap()
+
+    override fun getRoadObjectMetadata(roadObjectId: String): RoadObjectMetadata? =
+        roadObjectsStore?.getRoadObjectMetadata(roadObjectId)
+
+    override fun getRoadObjectLocation(roadObjectId: String): RoadObjectLocation? =
+        roadObjectsStore?.getRoadObjectLocation(roadObjectId)
+
+    override fun getRoadObjectIdsByEdgeIds(edgeIds: List<Long>): List<String?> =
+        roadObjectsStore?.getRoadObjectIdsByEdgeIds(edgeIds) ?: emptyList()
 
     private fun createDefaultPredictiveLocationTrackerOptions(
         predictiveCacheLocationOptions: PredictiveCacheLocationOptions
