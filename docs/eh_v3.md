@@ -9,13 +9,18 @@ mapboxNavigation.registerEHorizonObserver(eHorizonObserver)
 It provides the next callbacks:
 
 ```kotlin
+/**
+ * Electronic horizon listener. Callbacks are fired in the order specified.
+ * onPositionUpdated might be called multiple times after the other callbacks until a new change to
+ * the horizon occurs.
+ */
 interface EHorizonObserver {
 
     /**
-     * This callback is fired whenever the location on the EHorizon changes.
-     * @param position contains graph position, type and eHorizon object 
-     * @param distances is a map of eHorizon objects ids and their distances
-     * 
+     * This callback might be called multiple times when the position changes.
+     * @param position current electronic horizon position(map matched position + e-horizon tree)
+     * @param distances map road object id -> EHorizonObjectDistanceInfo for upcoming road objects
+     *
      */
     fun onPositionUpdated(
         position: EHorizonPosition,
@@ -23,13 +28,13 @@ interface EHorizonObserver {
     )
 
     /**
-     * This callback is fired whenever road object is entered
+     * Called when entry to line-like(i.e. which has length != null) road object was detected
      * @param objectEnterExitInfo contains info related to the object
      */
     fun onRoadObjectEnter(objectEnterExitInfo: EHorizonObjectEnterExitInfo)
 
     /**
-     * This callback is fired whenever road object is exited
+     * Called when exit from line-like(i.e. which has length != null) road object was detected
      * @param objectEnterExitInfo contains info related to the object
      */
     fun onRoadObjectExit(objectEnterExitInfo: EHorizonObjectEnterExitInfo)
@@ -63,7 +68,8 @@ mapboxNavigation.getEHorizonGraphAccessor()
 ```kotlin
 interface EHorizonGraphAccessor {
     /**
-     * Gets the shape of the EHorizon Edge
+     * Returns Graph Edge geometry for the given GraphId of the edge.
+     * If edge with given edgeId is not accessible, returns null
      * @param edgeId
      *
      * @return list of Points representing edge shape
@@ -71,7 +77,8 @@ interface EHorizonGraphAccessor {
     fun getEdgeShape(edgeId: Long): List<Point>?
 
     /**
-     * Gets the metadata of the EHorizon Edge
+     * Returns Graph Edge meta-information for the given GraphId of the edge.
+     * If edge with given edgeId is not accessible, returns null
      * @param edgeId
      *
      * @return EHorizonEdgeMetadata
@@ -87,5 +94,47 @@ mapboxNavigation.getEHorizonObjectsStore()
 ```
 
 ```kotlin
+interface EHorizonObjectsStore {
+    /**
+     * Returns mapping `road object id -> EHorizonObjectEdgeLocation` for all road objects
+     * which are lying on the edge with given id.
+     * @param edgeId
+     */
+    fun getRoadObjectsOnTheEdge(edgeId: Long): Map<String, EHorizonObjectEdgeLocation>
 
+    /**
+     * Returns metadata of object with given id, if such object cannot be found returns null.
+     * @param roadObjectId
+     */
+    fun getRoadObjectMetadata(roadObjectId: String): EHorizonObjectMetadata?
+
+    /**
+     * Returns location of object with given id, if such object cannot be found returns null.
+     * @param roadObjectId
+     */
+    fun getRoadObjectLocation(roadObjectId: String): EHorizonObjectLocation?
+
+    /**
+     * Returns list of road object ids which are (partially) belong to `edgeIds`.
+     * @param edgeIds list of edge ids
+     *
+     * @return list of road object ids
+     */
+    fun getRoadObjectIdsByEdgeIds(edgeIds: List<Long>): List<String>
+
+    /**
+     * Adds road object to be tracked in electronic horizon. In case if object with such id already
+     * exists updates it.
+     * @param roadObjectId unique id of the object
+     * @param openLRLocation road object location
+     * @param standard standard used to encode openLRLocation
+     */
+    fun addCustomRoadObject(roadObjectId: String, openLRLocation: String, standard: OpenLRStandard)
+
+    /**
+     * Removes road object(i.e. stops tracking it in electronic horizon)
+     * @param roadObjectId of road object
+     */
+    fun removeCustomRoadObject(roadObjectId: String)
+}
 ```

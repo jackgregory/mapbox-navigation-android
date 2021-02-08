@@ -4,12 +4,17 @@ import com.mapbox.navigation.core.trip.model.eh.EHorizonObjectDistanceInfo
 import com.mapbox.navigation.core.trip.model.eh.EHorizonObjectEnterExitInfo
 import com.mapbox.navigation.core.trip.model.eh.EHorizonPosition
 
+/**
+ * Electronic horizon listener. Callbacks are fired in the order specified.
+ * onPositionUpdated might be called multiple times after the other callbacks until a new change to
+ * the horizon occurs.
+ */
 interface EHorizonObserver {
 
     /**
-     * This callback is fired whenever the location on the EHorizon changes.
-     * @param position contains graph position, type and eHorizon object
-     * @param distances is a map of eHorizon objects ids and their distances
+     * This callback might be called multiple times when the position changes.
+     * @param position current electronic horizon position(map matched position + e-horizon tree)
+     * @param distances map road object id -> EHorizonObjectDistanceInfo for upcoming road objects
      *
      */
     fun onPositionUpdated(
@@ -18,13 +23,13 @@ interface EHorizonObserver {
     )
 
     /**
-     * This callback is fired whenever road object is entered
+     * Called when entry to line-like(i.e. which has length != null) road object was detected
      * @param objectEnterExitInfo contains info related to the object
      */
     fun onRoadObjectEnter(objectEnterExitInfo: EHorizonObjectEnterExitInfo)
 
     /**
-     * This callback is fired whenever road object is exited
+     * Called when exit from line-like(i.e. which has length != null) road object was detected
      * @param objectEnterExitInfo contains info related to the object
      */
     fun onRoadObjectExit(objectEnterExitInfo: EHorizonObjectEnterExitInfo)

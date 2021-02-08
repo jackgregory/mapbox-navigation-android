@@ -12,6 +12,7 @@ import com.mapbox.navigator.ElectronicHorizonObserver
 import com.mapbox.navigator.GraphAccessor
 import com.mapbox.navigator.NavigationStatus
 import com.mapbox.navigator.NavigatorConfig
+import com.mapbox.navigator.OpenLRDecoder
 import com.mapbox.navigator.PredictiveCacheController
 import com.mapbox.navigator.RoadObjectsStore
 import com.mapbox.navigator.RoadObjectsStoreObserver
@@ -279,6 +280,8 @@ interface MapboxNativeNavigator {
     val graphAccessor: GraphAccessor?
 
     val roadObjectsStore: RoadObjectsStore?
+
+    val openLRDecoder: OpenLRDecoder?
 
     val navigatorMapper: NavigatorMapper
 }
