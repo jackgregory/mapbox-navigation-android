@@ -11,5 +11,11 @@ interface EHorizonObjectsStore {
 
     fun getRoadObjectLocation(roadObjectId: String): EHorizonObjectLocation?
 
+    /**
+     * Gets all road objects on all edges
+     * @param edgeId
+     *
+     * @return list of Points representing edge shape
+     */
     fun getRoadObjectIdsByEdgeIds(edgeIds: List<Long>): List<String>
 }

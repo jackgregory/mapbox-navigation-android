@@ -16,7 +16,7 @@ interface EHorizonGraphAccessor {
      * Gets the metadata of the EHorizon Edge
      * @param edgeId
      *
-     * @return EdgeMetadata
+     * @return EHorizonEdgeMetadata
      */
     fun getEdgeMetadata(edgeId: Long): EHorizonEdgeMetadata?
 }
