@@ -8,14 +8,12 @@ import com.mapbox.navigation.base.options.DeviceProfile
 import com.mapbox.navigation.base.options.OnboardRouterOptions
 import com.mapbox.navigation.base.options.PredictiveCacheLocationOptions
 import com.mapbox.navigator.BannerInstruction
-import com.mapbox.navigator.EdgeMetadata
 import com.mapbox.navigator.ElectronicHorizonObserver
+import com.mapbox.navigator.GraphAccessor
 import com.mapbox.navigator.NavigationStatus
 import com.mapbox.navigator.NavigatorConfig
 import com.mapbox.navigator.PredictiveCacheController
-import com.mapbox.navigator.RoadObjectEdgeLocation
-import com.mapbox.navigator.RoadObjectLocation
-import com.mapbox.navigator.RoadObjectMetadata
+import com.mapbox.navigator.RoadObjectsStore
 import com.mapbox.navigator.RoadObjectsStoreObserver
 import com.mapbox.navigator.RouterResult
 import com.mapbox.navigator.SensorData
@@ -278,31 +276,9 @@ interface MapboxNativeNavigator {
         predictiveCacheLocationOptions: PredictiveCacheLocationOptions
     ): PredictiveCacheController
 
-    /**
-     * Gets the shape of the EHorizon Edge
-     * @param edgeId
-     *
-     * @return list of Points representing edge shape
-     */
-    fun getEdgeShape(edgeId: Long): List<Point>?
+    val graphAccessor: GraphAccessor?
 
-    /**
-     * Gets the metadata of the EHorizon Edge
-     * @param edgeId
-     *
-     * @return EdgeMetadata
-     */
-    fun getEdgeMetadata(edgeId: Long): EdgeMetadata?
-
-    //TODO not used at the moment. Remove?
-    fun getRoadObjectsOnTheEdge(edgeId: Long) : Map<String, RoadObjectEdgeLocation>
-
-    fun getRoadObjectMetadata(roadObjectId: String): RoadObjectMetadata?
-
-    fun getRoadObjectLocation(roadObjectId: String): RoadObjectLocation?
-
-    //TODO not used at the moment. Remove?
-    fun getRoadObjectIdsByEdgeIds(edgeIds: List<Long>): List<String?>
+    val roadObjectsStore: RoadObjectsStore?
 
     val navigatorMapper: NavigatorMapper
 }
